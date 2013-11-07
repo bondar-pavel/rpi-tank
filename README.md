@@ -17,10 +17,10 @@ Keyboard pressing are red and translated into actions.
 See hash %keys in soure code for more details.
 
 'WASD' controls are used for movement:<br>
-  'W' - move forward;
-  'S' - move backward;
-  'A' - move left;
-  'D' - move right;
-'[' and ']' are used to move tower left and right
+  'W' - move forward;<br>
+  'S' - move backward;<br>
+  'A' - move left;<br>
+  'D' - move right;<br>
+'[' and ']' are used to move tower left and right.
 
 License: MIT
