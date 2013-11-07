@@ -16,7 +16,7 @@ Exact match between pin and it's control functions you can see in source(hash %c
 Keyboard pressing are red and translated into actions.
 See hash %keys in soure code for more details.
 
-'WASD' controls are used for movement:
+'WASD' controls are used for movement:<br>
   'W' - move forward;
   'S' - move backward;
   'A' - move left;
