@@ -11,7 +11,12 @@ use Getopt::Long;
 use strict;
 
 my ($debug, $show_usage);
-GetOptions ('debug' =>\$debug, 'help' => \$show_usage);
+my $version = 2;
+GetOptions (
+	'debug' =>\$debug, 
+	'help' => \$show_usage,
+	'version|i' => \$version,
+);
 
 usage() if $show_usage;
 
@@ -19,7 +24,11 @@ Device::BCM2835::set_debug(1) if $debug;
 Device::BCM2835::init() || die "Could not init library";
 
 # define tank controls
-my %controls = (
+## This versioning looks pretty ugly for me,
+## but since it it just prof of concept I want to do it fast
+## Try to make it pretty a bit later(10 years later?:)
+# v1 uses only odd pinouts of gpio due to 1 element wide connector
+my %v1 = (
 	'left_forward'   => &Device::BCM2835::RPI_GPIO_P1_26,
 	'left_backward'  => &Device::BCM2835::RPI_GPIO_P1_24,
 
@@ -29,6 +38,29 @@ my %controls = (
 	'tower_left'     => &Device::BCM2835::RPI_GPIO_P1_16,
 	'tower_right'    => &Device::BCM2835::RPI_GPIO_P1_12,
 );
+# v2 uses floppy drive cable as gpio connector, so even and odd pinout of rasprebby pi can be used
+my %v2 = (
+	'left_forward'   => &Device::BCM2835::RPI_GPIO_P1_26,
+	'left_backward'  => &Device::BCM2835::RPI_GPIO_P1_24,
+
+	'right_forward'  => &Device::BCM2835::RPI_GPIO_P1_23,
+	'right_backward' => &Device::BCM2835::RPI_GPIO_P1_22,
+
+	'tower_left'     => &Device::BCM2835::RPI_GPIO_P1_21,
+	'tower_right'    => &Device::BCM2835::RPI_GPIO_P1_19,
+);
+
+my %controls;
+if ($version == 2){
+	%controls = %v2;
+} elsif ($version == 1) {
+	%controls = %v1;
+} else {
+	print "WTF? available versions only 1 and 2";
+	usage();
+}
+
+print "Using version $version\n";
 
 # define keys control hash
 my %keys = (
