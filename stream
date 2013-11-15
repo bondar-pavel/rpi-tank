@@ -9,7 +9,7 @@ FRAMERATE=3
 while getopts ":s:f:" opt; do
   case $opt in
     s)
-      echo "-s was triggered, Parameter: $OPTARG" >&2
+#      echo "-s was triggered, Parameter: $OPTARG" >&2
       case $OPTARG in
         hi)
           RESOLUTION=960x720
@@ -26,7 +26,7 @@ while getopts ":s:f:" opt; do
       esac
       ;;
     f)
-      echo "-f was triggered, Patameter: $OPTARG" >&2
+#      echo "-f was triggered, Patameter: $OPTARG" >&2
       FRAMERATE=$OPTARG
       ;;
     \?)
