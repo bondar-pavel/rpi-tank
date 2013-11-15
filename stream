@@ -1,0 +1,43 @@
+#!/bin/bash
+# Options 
+# -s for resolution(size) 
+# -f for framerate
+
+RESOLUTION=640x480
+FRAMERATE=3
+
+while getopts ":s:f:" opt; do
+  case $opt in
+    s)
+      echo "-s was triggered, Parameter: $OPTARG" >&2
+      case $OPTARG in
+        hi)
+          RESOLUTION=960x720
+          ;;
+        mid)
+          RESOLUTION=640x480
+          ;;
+        lo)
+          RESOLUTION=320x240
+          ;;
+        \?)
+          RESOLUTION=$OPTARG
+          ;;
+      esac
+      ;;
+    f)
+      echo "-f was triggered, Patameter: $OPTARG" >&2
+      FRAMERATE=$OPTARG
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+
+mjpg_streamer -i "/usr/lib/input_uvc.so -f $FRAMERATE -r $RESOLUTION" -o "/usr/lib/output_http.so -w /srv/http"
