@@ -53,8 +53,8 @@ sub init_hardware {
 	Device::BCM2835::set_debug(1) if $debug;
 
 	# set all controls as outputs
-	foreach my $pin (keys %controls){
-        	Device::BCM2835::gpio_fsel($controls{$pin}, &Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);
+	foreach my $pin (keys %pins){
+        	Device::BCM2835::gpio_fsel($pins{$pin}, &Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);
 	}
 }
 
@@ -71,13 +71,13 @@ sub init_network {
 }
 
 sub set_pinouts {
-	my %pins = map {$_ => 0} sort keys %controls;
+	my %values = map {$_ => 0} sort keys %pins;
 	#print join(',', keys %pins)."\n";
 	# set controls from the input to active state
-	map {$pins{$_} = 1 if exists $pins{$_}} @_;
+	map {$values{$_} = 1 if exists $values{$_}} @_;
 
-	foreach my $pin (sort keys %pins) {
-		Device::BCM2835::gpio_write($controls{$pin}, $pins{$pin});
+	foreach my $pin (sort keys %values) {
+		Device::BCM2835::gpio_write($pins{$pin}, $values{$pin});
 	}
 }
 
