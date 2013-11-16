@@ -28,13 +28,17 @@ my %commands = (
 	#'set_as_output' =>,
 	'set_output' =>,
 	# fallback output: if fallback timeout is exceeded, 
-	# server set fallback values as output in case of connection problems
-	'set_fallback_output' =>,
-	'set_fallback_timeout' =>,
+	'set_fallback_output' =>{
+		help =>	'If fallback timeout is exceeded, server set fallback values as output in case of connection problems',
+	},
+	'set_fallback_timeout' =>{
+		help => 'After timeout have passed fallback_output are set by server as outputs automatically' .
+			"\nHave no effect if unset or 0",
+	},
 	'get_input' =>,
-	'help' => 'Help, I need somebody, HELP!',
-	'exit' =>,
-	'quit' =>,
+	'help' => \&autogenerate_help,
+	'exit' => sub{ exit 0; },
+	'quit' => sub{ exit 0; },
 );
 
 # Hardware(BMC2835) is specific for raspbery pi platform
@@ -95,7 +99,7 @@ sub select_command {
 	if($command =~ /^(\S+)(.+)/){
 		my $cmd = lc($1);
 		if (exists $commands{$cmd}){
-			process_command($sock, $commands{$cmd});
+			process_command($sock, $commands{$cmd}, $2);
 		} else { 
 			$sock->send("Command $cmd is not a valid command, try help to see command list\n");
 		}
@@ -103,9 +107,29 @@ sub select_command {
 }
 
 sub process_command {
-	my ($sock, $cmd) = @_;
+	my ($sock, $cmd, $opts) = @_;
 
+	debug(ref($cmd));
 	$sock->send($cmd."\n");
+	if (ref($cmd) eq 'CODE') {
+		$sock->send("Calling bla-bla\n");
+		#&$cmd($sock);
+		$sock->$cmd;
+	}
+}
+
+sub autogenerate_help {
+	my $sock = shift;
+	$sock->send("Startint autogenerate\n");
+
+	foreach my $cmd (keys %commands) {
+		$sock->send($cmd ."\n");
+		if (ref($commands{$cmd}) eq 'HASH' and exists $commands{$cmd}->{help}){
+			$sock->send($cmd . " -\n");
+			# don't be afraid of next string it just adds TAB before each line of help message
+			$sock->send(join("\n", map{"\t" . $_} split("\n", $commands{$cmd}->{help})));
+		}
+	}
 }
 
 sub set_pinouts {
