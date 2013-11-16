@@ -6,19 +6,20 @@
 # author: Pavel Bondar, 2013
 # license: MIT
 
-use Device::BCM2835;
 use Getopt::Long;
 use IO::Socket;
 use strict;
 
-my ($debug, $show_usage);
+my ($debug, $debug_network, $show_usage);
 GetOptions (
-	'debug' =>\$debug, 
+	'debug' =>\$debug,
+	'debug-network' =>\$debug_network,
 	'help' => \$show_usage,
 );
 
 usage() if $show_usage;
 
+my %pins;
 my %command = (
 	'get_version' =>,
 	'get_versions' =>,
@@ -31,20 +32,9 @@ my %command = (
 	'get_input' =>,
 );
 
-# hardware pin that can be used for reading/writing
-my %pins = (
-	12 => &Device::BCM2835::RPI_GPIO_P1_12,
-	16 => &Device::BCM2835::RPI_GPIO_P1_16,
-	18 => &Device::BCM2835::RPI_GPIO_P1_18,
-	19 => &Device::BCM2835::RPI_GPIO_P1_19,
-	21 => &Device::BCM2835::RPI_GPIO_P1_21,
-	22 => &Device::BCM2835::RPI_GPIO_P1_22,
-	23 => &Device::BCM2835::RPI_GPIO_P1_23,
-	24 => &Device::BCM2835::RPI_GPIO_P1_24,
-	26 => &Device::BCM2835::RPI_GPIO_P1_26,
-);
-
-init_hardware();
+# Hardware(BMC2835) is specific for raspbery pi platform
+# so debuging on other platforms can be done using --debug-network flag
+init_hardware() unless $debug_network;
 
 my $sock = init_network();
 
@@ -59,10 +49,23 @@ while (1)
 }
 
 sub init_hardware {
+	require Device::BCM2835;
 	Device::BCM2835::init() || die "Could not init library";
 
 	Device::BCM2835::set_debug(1) if $debug;
 
+	# hardware pin that can be used for reading/writing
+	%pins = (
+		12 => &Device::BCM2835::RPI_GPIO_P1_12,
+		16 => &Device::BCM2835::RPI_GPIO_P1_16,
+		18 => &Device::BCM2835::RPI_GPIO_P1_18,
+		19 => &Device::BCM2835::RPI_GPIO_P1_19,
+		21 => &Device::BCM2835::RPI_GPIO_P1_21,
+		22 => &Device::BCM2835::RPI_GPIO_P1_22,
+		23 => &Device::BCM2835::RPI_GPIO_P1_23,
+		24 => &Device::BCM2835::RPI_GPIO_P1_24,
+		26 => &Device::BCM2835::RPI_GPIO_P1_26,
+	);
 	# set all controls as outputs
 	foreach my $pin (keys %pins){
         	Device::BCM2835::gpio_fsel($pins{$pin}, &Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);
