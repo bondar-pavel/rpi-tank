@@ -19,6 +19,17 @@ GetOptions (
 
 usage() if $show_usage;
 
+my %command = (
+	'get_version' =>,
+	'get_versions' =>,
+	'set_version' =>,
+	'set_use_sequence' =>,
+	'set_as_output' =>,
+	'set_output' =>,
+	'set_fallback_output' =>
+	'set_fallback_timeout' =>
+	'get_input' =>,
+);
 
 # hardware pin that can be used for reading/writing
 my %pins = (
