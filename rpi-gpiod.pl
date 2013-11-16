@@ -20,16 +20,21 @@ GetOptions (
 usage() if $show_usage;
 
 my %pins;
-my %command = (
-	'get_version' =>,
-	'get_versions' =>,
-	'set_version' =>,
-	'set_use_sequence' =>,
-	'set_as_output' =>,
+my %commands = (
+	'get_version' => '1',
+	'get_versions' => '1',
+	#'set_version' =>,
+	#'set_use_sequence' =>,
+	#'set_as_output' =>,
 	'set_output' =>,
-	'set_fallback_output' =>
-	'set_fallback_timeout' =>
+	# fallback output: if fallback timeout is exceeded, 
+	# server set fallback values as output in case of connection problems
+	'set_fallback_output' =>,
+	'set_fallback_timeout' =>,
 	'get_input' =>,
+	'help' => 'Help, I need somebody, HELP!',
+	'exit' =>,
+	'quit' =>,
 );
 
 # Hardware(BMC2835) is specific for raspbery pi platform
@@ -38,12 +43,13 @@ init_hardware() unless $debug_network;
 
 my $sock = init_network();
 
-# For now just accept connection
+# Allows only one client for now, no forking
 while (1)
 {
 	my $new_sock = $sock->accept();
 	while(<$new_sock>) {
-		print $_;
+		debug($_);
+		select_command($new_sock, $_);
 	}
 	close($sock);
 }
@@ -82,6 +88,24 @@ sub init_network {
 	                      );
 	die "Could not create socket: $!\n" unless $sock;
 	return $sock;
+}
+
+sub select_command {
+	my ($sock, $command) = @_;
+	if($command =~ /^(\S+)(.+)/){
+		my $cmd = lc($1);
+		if (exists $commands{$cmd}){
+			process_command($sock, $commands{$cmd});
+		} else { 
+			$sock->send("Command $cmd is not a valid command, try help to see command list\n");
+		}
+	}
+}
+
+sub process_command {
+	my ($sock, $cmd) = @_;
+
+	$sock->send($cmd."\n");
 }
 
 sub set_pinouts {
