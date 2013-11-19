@@ -26,15 +26,15 @@ my %commands = (
 	#'set_version' =>,
 	#'set_use_sequence' =>,
 	#'set_as_output' =>,
-	'set_output' =>,
+	'set_output' =>\&set_output,
 	# fallback output: if fallback timeout is exceeded, 
 	# server set fallback values as output in case of connection problems
-	'set_fallback_output' =>,
-	'set_fallback_timeout' =>,
-	'get_input' =>,
+	#'set_fallback_output' =>,
+	#'set_fallback_timeout' =>,
+	#'get_input' =>,
 	'help' => 'Help, I need somebody, HELP!',
-	'exit' =>,
-	'quit' =>,
+	'exit' => \&close_connection,
+	'quit' => \&close_connection,
 );
 
 # Hardware(BMC2835) is specific for raspbery pi platform
@@ -51,7 +51,7 @@ while (1)
 		debug($_);
 		select_command($new_sock, $_);
 	}
-	close($sock);
+	close($new_sock);
 }
 
 sub init_hardware {
@@ -92,10 +92,13 @@ sub init_network {
 
 sub select_command {
 	my ($sock, $command) = @_;
-	if($command =~ /^(\S+)(.+)/){
+	if($command =~ /^(\S+)(.+)$/){
 		my $cmd = lc($1);
+		my @params = split(/\s+/, $2);
+		shift @params;	#remove space between command and arguments
+		print $sock "Params are ". join(" ", @params)."\n";
 		if (exists $commands{$cmd}){
-			process_command($sock, $commands{$cmd});
+			process_command($sock, $commands{$cmd}, @params);
 		} else { 
 			$sock->send("Command $cmd is not a valid command, try help to see command list\n");
 		}
@@ -103,15 +106,36 @@ sub select_command {
 }
 
 sub process_command {
-	my ($sock, $cmd) = @_;
+	my $sock = shift; 
+	my $cmd = shift;
+	my @args = @_;
 
-	$sock->send($cmd."\n");
+	if(ref($cmd) eq 'CODE') {
+		&{$cmd}($sock, @args);
+	} else {
+		print $sock $cmd;
+	}
+
+}
+
+sub close_connection {
+	my $sock = shift;
+
+	close($sock);
+}
+
+sub set_output {
+	my $sock = shift;
+	#my %output_pins = %{@_};
+	#my @up_pins = grep { $output_pins{$_} } keys %output_pins;
+	#set_pinouts(@up_pins);
+	set_pinouts(@_);
 }
 
 sub set_pinouts {
 	my %values = map {$_ => 0} sort keys %pins;
-	#print join(',', keys %pins)."\n";
-	# set controls from the input to active state
+	print join(',', keys %pins)."\n";
+	# set controls pins grabbed from input to high state
 	map {$values{$_} = 1 if exists $values{$_}} @_;
 
 	foreach my $pin (sort keys %values) {
