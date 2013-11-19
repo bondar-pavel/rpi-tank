@@ -72,6 +72,16 @@ my %keys = (
 	']' => \&tower_move_right,
 );
 
+# hash button names, just to show correct direction
+my %key_names = (
+	'a' => 'left',
+	'w' => 'forward',
+	's' => 'backward',
+	'd' => 'right',
+	'[' => 'tower left',
+	']' => 'tower right',
+);
+
 # set all controls as outputs
 foreach my $pin (keys %controls){
 	Device::BCM2835::gpio_fsel($controls{$pin}, &Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);
@@ -88,10 +98,12 @@ $SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = sub { die; };
 while (1)
 {
 	my $char = lc(ReadKey(0.2));
-	print "Char is $char, " .ord($char). "\n";
+	
 	if (exists $keys{$char} and ref($keys{$char}) eq 'CODE'){
+		print "Moving $key_names{$char}\n" if exists $key_names{$char};
 		&{$keys{$char}};
 	} else {
+		print "Stop\n";
 		stop();
 	}
 	#Device::BCM2835::delay(200); # Milliseconds
