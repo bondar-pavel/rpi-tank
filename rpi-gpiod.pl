@@ -5,6 +5,19 @@
 # Developed for Raspberry Pi GPIO(BCM2835)
 # author: Pavel Bondar, 2013
 # license: MIT
+#
+# How to deal with it:
+# - open connection to port 11700
+# - send 'set_output 1 3 12' - pins 1 3 12 will be set as 1
+#    all other pins will be set as 0.
+# - once you are done send 'exit', or 'quit'
+# - for debug purpose you can connect via 'telnet localhost 11700',
+#   than you can check how daemon reacts on your commands
+# - when debugging it is usefull to run daemon with flags 
+#   --debug --debug-network
+# --debug-network is needed when you dont want to initialize hardware
+#   so specific hardware modules(BMC2835) will not be loaded
+
 
 use Getopt::Long;
 use IO::Socket;
