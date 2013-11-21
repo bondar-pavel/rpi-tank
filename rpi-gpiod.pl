@@ -32,6 +32,8 @@ GetOptions (
 
 usage() if $show_usage;
 
+my $fallback_output;
+my $fallback_timeout = 10;
 my %pins;
 my %commands = (
 	'get_version' => '1',
@@ -60,9 +62,17 @@ my $sock = init_network();
 while (1)
 {
 	my $new_sock = $sock->accept();
+
+	# Reset outputs to default state in case of exceeding $fallback_timeout 
+	$SIG{ALRM} = \&reset_output;
+	alarm $fallback_timeout;
 	while(<$new_sock>) {
+		alarm 0;
+
 		debug($_);
 		select_command($new_sock, $_);
+
+		alarm $fallback_timeout;
 	}
 	close($new_sock);
 }
@@ -89,6 +99,8 @@ sub init_hardware {
 	foreach my $pin (keys %pins){
         	Device::BCM2835::gpio_fsel($pins{$pin}, &Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);
 	}
+	# set all outputs as 0
+	set_pinouts();
 }
 
 sub init_network {
@@ -145,13 +157,18 @@ sub set_output {
 	set_pinouts(@_);
 }
 
+sub reset_output {
+	debug("Received SIG ALARM\n");
+	set_pinouts($fallback_output);
+}
+
 sub set_pinouts {
 	my %values = map {$_ => 0} sort keys %pins;
-	print join(',', keys %pins)."\n";
 	# set controls pins grabbed from input to high state
 	map {$values{$_} = 1 if exists $values{$_}} @_;
 
 	foreach my $pin (sort keys %values) {
+		debug("Set output pin $pin with value $values{$pin}");
 		Device::BCM2835::gpio_write($pins{$pin}, $values{$pin});
 	}
 }
