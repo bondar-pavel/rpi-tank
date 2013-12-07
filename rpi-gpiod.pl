@@ -14,26 +14,31 @@
 # - for debug purpose you can connect via 'telnet localhost 11700',
 #   than you can check how daemon reacts on your commands
 # - when debugging it is usefull to run daemon with flags 
-#   --debug --debug-network
+#   --debug --debug-network --debug-hardware
 # --debug-network is needed when you dont want to initialize hardware
 #   so specific hardware modules(BMC2835) will not be loaded
+# --debug-hardware initialize hardware in debug mode,
+#   so gpio pins actually will not be set,
+#   just printing what values are gonna be set.
 
 
 use Getopt::Long;
 use IO::Socket;
 use strict;
 
-my ($debug, $debug_network, $show_usage);
+my ($debug, $verbose, $debug_network, $debug_hardware, $show_usage);
 GetOptions (
 	'debug' =>\$debug,
+	'verbose' =>\$verbose,
 	'debug-network' =>\$debug_network,
+	'debug-hardware' =>\$debug_hardware,
 	'help' => \$show_usage,
 );
 
 usage() if $show_usage;
 
 my $fallback_output;
-my $fallback_timeout = 10;
+my $fallback_timeout = 1;
 my %pins;
 my %commands = (
 	'get_version' => '1',
@@ -69,7 +74,7 @@ while (1)
 	while(<$new_sock>) {
 		alarm 0;
 
-		debug($_);
+		info($_);
 		select_command($new_sock, $_);
 
 		alarm $fallback_timeout;
@@ -81,7 +86,7 @@ sub init_hardware {
 	require Device::BCM2835;
 	Device::BCM2835::init() || die "Could not init library";
 
-	Device::BCM2835::set_debug(1) if $debug;
+	Device::BCM2835::set_debug(1) if $debug_hardware;
 
 	# hardware pin that can be used for reading/writing
 	%pins = (
@@ -158,7 +163,7 @@ sub set_output {
 }
 
 sub reset_output {
-	debug("Received SIG ALARM\n");
+	info("Received SIG ALARM\n");
 	set_pinouts($fallback_output);
 }
 
@@ -174,6 +179,9 @@ sub set_pinouts {
 }
 
 # service routines
+sub info {
+	print shift,"\n" if $debug or $verbose; 
+}
 
 sub debug {
 	print shift."\n" if $debug;
