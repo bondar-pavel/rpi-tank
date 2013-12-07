@@ -5,7 +5,7 @@
 # author: Pavel Bondar, 2013
 # license: MIT
 
-use Device::BCM2835;
+use IO::Socket;
 use Term::ReadKey;
 use Getopt::Long;
 use strict;
@@ -20,34 +20,31 @@ GetOptions (
 
 usage() if $show_usage;
 
-Device::BCM2835::set_debug(1) if $debug;
-Device::BCM2835::init() || die "Could not init library";
-
 # define tank controls
 ## This versioning looks pretty ugly for me,
 ## but since it it just prof of concept I want to do it fast
 ## Try to make it pretty a bit later(10 years later?:)
 # v1 uses only odd pinouts of gpio due to 1 element wide connector
 my %v1 = (
-	'left_forward'   => &Device::BCM2835::RPI_GPIO_P1_26,
-	'left_backward'  => &Device::BCM2835::RPI_GPIO_P1_24,
+	'left_forward'   => 26,
+	'left_backward'  => 24,
 
-	'right_forward'  => &Device::BCM2835::RPI_GPIO_P1_22,
-	'right_backward' => &Device::BCM2835::RPI_GPIO_P1_18,
+	'right_forward'  => 22,
+	'right_backward' => 18,
 
-	'tower_left'     => &Device::BCM2835::RPI_GPIO_P1_16,
-	'tower_right'    => &Device::BCM2835::RPI_GPIO_P1_12,
+	'tower_left'     => 16,
+	'tower_right'    => 12,
 );
 # v2 uses floppy drive cable as gpio connector, so even and odd pinout of rasprebby pi can be used
 my %v2 = (
-	'left_forward'   => &Device::BCM2835::RPI_GPIO_P1_26,
-	'left_backward'  => &Device::BCM2835::RPI_GPIO_P1_24,
+	'left_forward'   => 26,
+	'left_backward'  => 24,
 
-	'right_forward'  => &Device::BCM2835::RPI_GPIO_P1_23,
-	'right_backward' => &Device::BCM2835::RPI_GPIO_P1_22,
+	'right_forward'  => 23,
+	'right_backward' => 22,
 
-	'tower_left'     => &Device::BCM2835::RPI_GPIO_P1_21,
-	'tower_right'    => &Device::BCM2835::RPI_GPIO_P1_19,
+	'tower_left'     => 21,
+	'tower_right'    => 19,
 );
 
 my %controls;
@@ -82,18 +79,13 @@ my %key_names = (
 	']' => 'tower right',
 );
 
-# set all controls as outputs
-foreach my $pin (keys %controls){
-	Device::BCM2835::gpio_fsel($controls{$pin}, &Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);
-}
-
-# clear all control bits after initialization
-stop();
+# establish connection to gpiod
+my $socket  = init_network($ARGV[0]);
 
 # set custom readmode and return it back to normal after terminating
 ReadMode('cbreak');
 END {ReadMode('normal');}
-$SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = sub { die; };
+$SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = sub {$socket->close; die; };
 
 while (1)
 {
@@ -106,7 +98,6 @@ while (1)
 		print "Stop\n";
 		stop();
 	}
-	#Device::BCM2835::delay(200); # Milliseconds
 }
 
 # Control actions
@@ -153,14 +144,24 @@ sub tower_move_right {
 }
 
 sub set_pinouts {
-	my %pins = map {$_ => 0} sort keys %controls;
-	#print join(',', keys %pins)."\n";
 	# set controls from the input to active state
-	map {$pins{$_} = 1 if exists $pins{$_}} @_;
+	my @pins = map {$controls{$_} if exists $controls{$_}} @_;
+	my $cmd = 'set_output '.join(' ', @pins)."\n";
 
-	foreach my $pin (sort keys %pins) {
-		Device::BCM2835::gpio_write($controls{$pin}, $pins{$pin});
-	}
+	print {$socket} $cmd;
+}
+
+sub init_network {
+	my $host = shift || '127.0.0.1';
+print $host."\n";
+        my $sock = new IO::Socket::INET (
+                                PeerHost => $host,
+                                PeerPort => '11700',
+                                Proto => 'tcp',
+                              );
+        die "Could not create socket: $!\n" unless $sock;
+	debug("Connection established");
+        return $sock;
 }
 
 # service routines
