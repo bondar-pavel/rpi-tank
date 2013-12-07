@@ -79,7 +79,7 @@ while (1)
 
 		alarm $fallback_timeout;
 	}
-	close($new_sock);
+	close($new_sock) if $new_sock;
 }
 
 sub init_hardware {
