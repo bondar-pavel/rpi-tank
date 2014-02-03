@@ -52,7 +52,7 @@ my %commands = (
 		help => 'After timeout have passed fallback_output are set by server as outputs automatically' .
 			"\nHave no effect if unset or 0",
 	},
-	#'get_input' =>,
+	'video' => \&run_video_stream,
 	'help' => \&autogenerate_help,
 	'exit' => \&close_connection,
 	'quit' => \&close_connection,
@@ -177,6 +177,50 @@ sub set_pinouts {
 		debug("Set output pin $pin with value $values{$pin}");
 		Device::BCM2835::gpio_write($pins{$pin}, $values{$pin});
 	}
+}
+
+my $video_pid;
+
+sub run_video_stream {
+	# kill any existing video stream before starting new one
+	kill_video_stream() if ($video_pid);
+
+	if ($video_pid = fork() ) {
+		debug("Forked successfully");
+	} elsif ($video_pid == 0) {
+		exec_stream(@_);
+	} else {
+		info("Unable to fork");
+	}
+}
+
+sub exec_stream {
+	my $resolution = shift;
+        my $framerate = int(shift);
+	my @opts = qw( rpi-video );
+	my @resolutions = qw( hi mid lo);
+	
+	# check if resolution is in allowed list
+	if ( grep{$resolution eq $_} @resolutions ) {
+		push @opts, '-s', $resolution;
+	}
+	if ( $framerate > 0 && $framerate <= 30) {
+		push @opts, '-f', $framerate;
+	}
+	exec(@opts);
+}
+
+sub is_video_stream_alive {
+	return kill 0, $video_pid;
+}
+
+sub kill_video_stream {
+	if (is_video_stream_alive()){
+		kill '-TERM', $video_pid;
+		sleep 3;
+		kill '-KILL', $video_pid if (is_video_stream_alive());
+	}
+	$video_pid = undef;
 }
 
 sub autogenerate_help {
