@@ -123,7 +123,7 @@ sub init_network {
 
 sub select_command {
 	my ($sock, $command) = @_;
-	if($command =~ /^(\S+)(.+)$/){
+	if($command =~ /^(\S+)(.*)$/){
 		my $cmd = lc($1);
 		my @params = split(/\s+/, $2);
 		shift @params;	#remove space between command and arguments
@@ -225,7 +225,6 @@ sub kill_video_stream {
 
 sub autogenerate_help {
 	my $sock = shift;
-	$sock->send("Startint autogenerate\n");
 
 	foreach my $cmd (keys %commands) {
 		$sock->send($cmd ."\n");
