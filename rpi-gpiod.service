@@ -3,3 +3,6 @@ Description="Raspberry Pi GPIO daemon"
 
 [Service]
 ExecStart=/usr/bin/rpi-gpiod
+
+[Install]
+WantedBy=multi-user.target
