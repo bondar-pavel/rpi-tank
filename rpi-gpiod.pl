@@ -40,7 +40,12 @@ my $fallback_output;
 my $fallback_timeout = 1;
 my %pins;
 my %commands = (
-	'set_output' =>\&set_output,
+	'set_output' =>{
+		code => \&set_output,
+		help => "Set list of pins into high state. Will be cleared to fallbackoutput values\n" .
+			"once fallback timeout has exceeded.\n" .
+			"Example 'set_output 23 26'."
+	},
 	# fallback output: if fallback timeout is exceeded, 
 	'set_fallback_output' =>{
 		help =>	'If fallback timeout is exceeded, server set fallback values as output in case of connection problems.',
@@ -48,15 +53,24 @@ my %commands = (
 	'set_fallback_timeout' =>{
 		code => \&set_fallback_timeout,
 		help => 'After timeout have passed fallback_output are set by server as outputs automatically.' .
-			"\nHave no effect if unset or 0",
+			"\nHave no effect if unset or 0.",
 	},
 	'video' => \&run_video_stream,
-	'help' => \&autogenerate_help,
-	'exit' => \&close_connection,
-	'quit' => \&close_connection,
+	'help' => {
+		code => \&autogenerate_help,
+		help => 'Generate this help.'
+	},
+	'exit' => {
+		code => \&close_connection,
+		help => 'Closes connection to the client.'
+	},
+	'quit' => {
+		code => \&close_connection,
+		help => 'Closes connection to the client.'
+	},
 );
 
-# Hardware(BMC2835) is specific for raspbery pi platform
+# Hardware(BMC2835) is specific for Raspberry Pi platform
 # so debuging on other platforms can be done using --debug-network flag
 init_hardware() unless $debug_network;
 
@@ -66,11 +80,12 @@ my $sock = init_network();
 while (1)
 {
 	my $new_sock = $sock->accept();
+	next unless $new_sock;
+
 	info("Client connected");
 
 	# Reset outputs to default state in case of exceeding $fallback_timeout 
 	$SIG{ALRM} = \&reset_output;
-	#alarm $fallback_timeout;
 
 	# give user friendly command promt
 	$new_sock->send('>');
@@ -78,7 +93,7 @@ while (1)
 	while(<$new_sock>) {
 		alarm 0;
 
-		info($_);
+		info("Receiving transmission: " . $_);
 		select_command($new_sock, $_);
 		alarm $fallback_timeout;
 
@@ -178,7 +193,8 @@ sub set_output {
 }
 
 sub reset_output {
-	info("Received SIG ALARM\n");
+	info("*");
+	debug("SIG{ALARM}: resetting output\n");
 	set_pinouts($fallback_output);
 }
 
@@ -241,8 +257,8 @@ sub autogenerate_help {
 	my $sock = shift;
 
 	$sock->send("List of commands:\n");
-	foreach my $cmd (keys %commands) {
-		$sock->send($cmd ."\n");
+	foreach my $cmd (sort keys %commands) {
+		$sock->send($cmd ." -\n");
 		if (ref($commands{$cmd}) eq 'HASH' and exists $commands{$cmd}->{help}){
 			# add TAB before each line of help message
 			$sock->send(join("\n", map{"\t" . $_} split("\n", $commands{$cmd}->{help}))."\n");
