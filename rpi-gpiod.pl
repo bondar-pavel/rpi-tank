@@ -3,8 +3,8 @@
 # This program allows you to control GPIO pins over network.
 # TCP-IP socket is used, by default port is 11700
 # Developed for Raspberry Pi GPIO(BCM2835)
-# author: Pavel Bondar, 2013
-# license: MIT
+# author: Pavel Bondar, 2013-2014
+# license: MIT, see LICENCE file for details
 #
 # How to deal with it:
 # - open connection to port 11700
