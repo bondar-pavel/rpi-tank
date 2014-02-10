@@ -48,7 +48,8 @@ my %commands = (
 	},
 	# fallback output: if fallback timeout is exceeded, 
 	'set_fallback_output' =>{
-		help =>	'If fallback timeout is exceeded, server set fallback values as output in case of connection problems.',
+		help =>	"If fallback timeout is exceeded, server set fallback values as output.\n" .
+			"Useful to stop in case of connection issues.",
 	},
 	'set_fallback_timeout' =>{
 		code => \&set_fallback_timeout,
@@ -150,7 +151,7 @@ sub select_command {
 		if (exists $commands{$cmd}){
 			process_command($sock, $commands{$cmd}, @params);
 		} else { 
-			$sock->send("Command $cmd is not a valid command, try help to see command list\n");
+			$sock->send("Command '$cmd' is not a valid command, try 'help' to see commands list\n");
 		}
 	}
 }
