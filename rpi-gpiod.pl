@@ -42,7 +42,7 @@ my %pins;
 my %commands = (
 	'set_output' =>{
 		code => \&set_output,
-		help => "Set list of pins into high state. Will be cleared to fallbackoutput values\n" .
+		help => "Set list of pins into high state. Will be set to fallback output values\n" .
 			"once fallback timeout has exceeded.\n" .
 			"Example 'set_output 23 26'."
 	},
@@ -62,11 +62,11 @@ my %commands = (
 	},
 	'exit' => {
 		code => \&close_connection,
-		help => 'Closes connection to the client.'
+		help => 'Close connection to the client.'
 	},
 	'quit' => {
 		code => \&close_connection,
-		help => 'Closes connection to the client.'
+		help => 'Close connection to the client.'
 	},
 );
 
