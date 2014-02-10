@@ -26,10 +26,9 @@ use Getopt::Long;
 use IO::Socket;
 use strict;
 
-my ($debug, $verbose, $debug_network, $debug_hardware, $show_usage);
+my ($debug, $debug_network, $debug_hardware, $show_usage);
 GetOptions (
 	'debug' =>\$debug,
-	'verbose' =>\$verbose,
 	'debug-network' =>\$debug_network,
 	'debug-hardware' =>\$debug_hardware,
 	'help' => \$show_usage,
@@ -41,15 +40,14 @@ my $fallback_output;
 my $fallback_timeout = 1;
 my %pins;
 my %commands = (
-	'get_version' => '1',
-	'get_versions' => '1',
 	'set_output' =>\&set_output,
 	# fallback output: if fallback timeout is exceeded, 
 	'set_fallback_output' =>{
-		help =>	'If fallback timeout is exceeded, server set fallback values as output in case of connection problems',
+		help =>	'If fallback timeout is exceeded, server set fallback values as output in case of connection problems.',
 	},
 	'set_fallback_timeout' =>{
-		help => 'After timeout have passed fallback_output are set by server as outputs automatically' .
+		code => \&set_fallback_timeout,
+		help => 'After timeout have passed fallback_output are set by server as outputs automatically.' .
 			"\nHave no effect if unset or 0",
 	},
 	'video' => \&run_video_stream,
@@ -68,19 +66,26 @@ my $sock = init_network();
 while (1)
 {
 	my $new_sock = $sock->accept();
+	info("Client connected");
 
 	# Reset outputs to default state in case of exceeding $fallback_timeout 
 	$SIG{ALRM} = \&reset_output;
-	alarm $fallback_timeout;
+	#alarm $fallback_timeout;
+
+	# give user friendly command promt
+	$new_sock->send('>');
+
 	while(<$new_sock>) {
 		alarm 0;
 
 		info($_);
 		select_command($new_sock, $_);
-
 		alarm $fallback_timeout;
+
+		$new_sock->send('>');
 	}
 	close($new_sock) if $new_sock;
+	info("Client disconnected");
 }
 
 sub init_hardware {
@@ -127,7 +132,7 @@ sub select_command {
 		my $cmd = lc($1);
 		my @params = split(/\s+/, $2);
 		shift @params;	#remove space between command and arguments
-		print $sock "Params are ". join(" ", @params)."\n";
+		print $sock "Params are ". join(" ", @params)."\n" if ($debug);
 		if (exists $commands{$cmd}){
 			process_command($sock, $commands{$cmd}, @params);
 		} else { 
@@ -141,8 +146,10 @@ sub process_command {
 	my $cmd = shift;
 	my @args = @_;
 
-	if(ref($cmd) eq 'CODE') {
+	if (ref($cmd) eq 'CODE') {
 		&{$cmd}($sock, @args);
+	} elsif (ref($cmd) eq 'HASH' && exists $$cmd{code}) {
+		&{$$cmd{code}}($sock, @args);
 	} else {
 		print $sock $cmd;
 	}
@@ -153,6 +160,13 @@ sub close_connection {
 	my $sock = shift;
 
 	close($sock);
+}
+
+sub set_fallback_timeout {
+	my $sock = shift;
+	my $timeout = int(shift);
+
+	$fallback_timeout = $timeout if ($timeout > 0 && $timeout < 30);
 }
 
 sub set_output {
@@ -226,18 +240,18 @@ sub kill_video_stream {
 sub autogenerate_help {
 	my $sock = shift;
 
+	$sock->send("List of commands:\n");
 	foreach my $cmd (keys %commands) {
 		$sock->send($cmd ."\n");
 		if (ref($commands{$cmd}) eq 'HASH' and exists $commands{$cmd}->{help}){
-			$sock->send($cmd . " -\n");
 			# add TAB before each line of help message
-			$sock->send(join("\n", map{"\t" . $_} split("\n", $commands{$cmd}->{help})));
+			$sock->send(join("\n", map{"\t" . $_} split("\n", $commands{$cmd}->{help}))."\n");
 		}
 	}
 }
 # service routines
 sub info {
-	print shift,"\n" if $debug or $verbose; 
+	print shift,"\n"; 
 }
 
 sub debug {
