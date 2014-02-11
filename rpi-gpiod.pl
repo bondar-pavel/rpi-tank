@@ -76,31 +76,41 @@ init_hardware() unless $debug_network;
 
 my $sock = init_network();
 
+# prevent zombies
+$SIG{CHLD} = 'IGNORE';
+
 # Allows only one client for now, no forking
 while (1)
 {
 	my $new_sock = $sock->accept();
-	next unless $new_sock;
 
-	info("Client connected");
+	if (my $pid = fork()) {
+		debug("Forked successfully");
+		next;
+	} elsif ($pid == 0) {
+		info("Client connected");
 
-	# Reset outputs to default state in case of exceeding $fallback_timeout 
-	$SIG{ALRM} = \&reset_output;
+		# Reset outputs to default state in case of exceeding $fallback_timeout 
+		$SIG{ALRM} = \&reset_output;
 
-	# give user friendly command promt
-	$new_sock->send('>');
-
-	while(<$new_sock>) {
-		alarm 0;
-
-		info("Receiving transmission: " . $_);
-		select_command($new_sock, $_);
-		alarm $fallback_timeout;
-
+		# give user friendly command promt
 		$new_sock->send('>');
+
+		while(<$new_sock>) {
+			alarm 0;
+
+			info("Receiving transmission: " . $_);
+			select_command($new_sock, $_);
+			alarm $fallback_timeout;
+
+			$new_sock->send('>');
+		}
+		close($new_sock) if $new_sock;
+		info("Client disconnected");
+		exit 0;
+	} else {
+		info("Failed to fork");
 	}
-	close($new_sock) if $new_sock;
-	info("Client disconnected");
 }
 
 sub init_hardware {
