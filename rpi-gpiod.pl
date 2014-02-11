@@ -233,11 +233,13 @@ sub autogenerate_help {
 }
 # service routines
 sub info {
-	print shift,"\n"; 
+	my $msg = shift;
+	print "[$$] $msg\n"; 
 }
 
 sub debug {
-	print shift."\n" if $debug;
+	my $msg = shift;
+	print "[$$] $msg\n" if $debug;
 }
 
 sub usage {
