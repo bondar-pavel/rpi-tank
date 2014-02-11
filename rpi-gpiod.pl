@@ -21,9 +21,10 @@
 #   so gpio pins actually will not be set,
 #   just printing what values are gonna be set.
 
-
 use Getopt::Long;
+use File::Touch;
 use IO::Socket;
+use Fcntl qw(:flock);
 use strict;
 
 my ($debug, $debug_network, $debug_hardware, $show_usage);
@@ -69,6 +70,8 @@ my %commands = (
 		help => 'Close connection to the client.'
 	},
 );
+
+my $lock_file = '/tmp/rpi-gpiod.lock';
 
 # Hardware(BMC2835) is specific for Raspberry Pi platform
 # so debuging on other platforms can be done using --debug-network flag
@@ -213,10 +216,21 @@ sub set_pinouts {
 	# set controls pins grabbed from input to high state
 	map {$values{$_} = 1 if exists $values{$_}} @_;
 
+	# Exlusively lock gpio_write operations
+	# to synhronize all forked processes
+	# so only one process set outputs at the same time
+	touch($lock_file) unless -s $lock_file;
+	open(my $fh, '<', $lock_file) || return info("Unable to open $lock_file, skipping...");
+	flock($fh, LOCK_EX) || return info("Ubable to lock $lock_file, skipping...");
+
 	foreach my $pin (sort keys %values) {
 		debug("Set output pin $pin with value $values{$pin}");
 		Device::BCM2835::gpio_write($pins{$pin}, $values{$pin});
 	}
+
+	# Release lock
+	flock($fh, LOCK_UN);
+	close($fh);
 }
 
 sub autogenerate_help {
