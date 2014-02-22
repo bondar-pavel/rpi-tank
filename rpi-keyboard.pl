@@ -122,13 +122,13 @@ sub stop {
 sub left {
 	debug('Turn left');
 
-	set_pinouts('right_forward');
+	set_pinouts('right_forward', 'left_backward');
 }
 
 sub right {
 	debug('Turn right');
 
-	set_pinouts('left_forward');
+	set_pinouts('left_forward', 'right_backward');
 }
 
 sub tower_move_left {
