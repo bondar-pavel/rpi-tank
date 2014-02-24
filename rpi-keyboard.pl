@@ -119,16 +119,28 @@ sub stop {
 	set_pinouts();
 }
 
+sub left_fast {
+	debug('Turn left fast');
+
+	set_pinouts('right_forward', 'left_backward');
+}
+
 sub left {
 	debug('Turn left');
 
-	set_pinouts('right_forward', 'left_backward');
+	set_pinouts('right_forward');
+}
+
+sub right_fast {
+	debug('Turn right fast');
+
+	set_pinouts('left_forward', 'right_backward');
 }
 
 sub right {
 	debug('Turn right');
 
-	set_pinouts('left_forward', 'right_backward');
+	set_pinouts('left_forward');
 }
 
 sub tower_move_left {
