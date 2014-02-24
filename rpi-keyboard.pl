@@ -62,9 +62,11 @@ print "Using version $version\n";
 # define keys control hash
 my %keys = (
 	'a' => \&left,
+	'A' => \&left_fast,
 	'w' => \&forward,
 	's' => \&backward,
 	'd' => \&right,
+	'D' => \&right_fast,
 	'[' => \&tower_move_left,
 	']' => \&tower_move_right,
 );
@@ -72,9 +74,11 @@ my %keys = (
 # hash button names, just to show correct direction
 my %key_names = (
 	'a' => 'left',
+	'A' => 'left fast',
 	'w' => 'forward',
 	's' => 'backward',
 	'd' => 'right',
+	'D' => 'right fast',
 	'[' => 'tower left',
 	']' => 'tower right',
 );
@@ -89,8 +93,7 @@ $SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = sub {$socket->close; die; };
 
 while (1)
 {
-	my $char = lc(ReadKey(0.2));
-	
+	my $char = ReadKey(0.2);
 	if (exists $keys{$char} and ref($keys{$char}) eq 'CODE'){
 		print "Moving $key_names{$char}\n" if exists $key_names{$char};
 		&{$keys{$char}};
@@ -102,56 +105,38 @@ while (1)
 
 # Control actions
 sub forward {
-	debug('Move forward');
-
 	set_pinouts('left_forward', 'right_forward');
 }
 
 sub backward {
-	debug('Move backward');
-
 	set_pinouts('left_backward', 'right_backward');
 }
 
 sub stop {
-	debug('Stop');
-
 	set_pinouts();
 }
 
 sub left_fast {
-	debug('Turn left fast');
-
 	set_pinouts('right_forward', 'left_backward');
 }
 
 sub left {
-	debug('Turn left');
-
 	set_pinouts('right_forward');
 }
 
 sub right_fast {
-	debug('Turn right fast');
-
 	set_pinouts('left_forward', 'right_backward');
 }
 
 sub right {
-	debug('Turn right');
-
 	set_pinouts('left_forward');
 }
 
 sub tower_move_left {
-        debug('Move tower left');
-
 	set_pinouts('tower_left');
 }
 
 sub tower_move_right {
-        debug('Move tower right');
-
 	set_pinouts('tower_right');
 }
 
@@ -165,7 +150,7 @@ sub set_pinouts {
 
 sub init_network {
 	my $host = shift || '127.0.0.1';
-print $host."\n";
+	print $host."\n";
         my $sock = new IO::Socket::INET (
                                 PeerHost => $host,
                                 PeerPort => '11700',
@@ -185,10 +170,12 @@ sub debug {
 sub usage {
 	print <<EOF;
 'WASD' controls are used for movement:
-  'W' - move forward;
-  'S' - move backward;
-  'A' - move left;
-  'D' - move right;
+  'w' - move forward;
+  's' - move backward;
+  'a' - move left;
+  'A' - move left fast;
+  'd' - move right;
+  'D' - move right fast;
 '[' and ']' are used to move tower left and right
 EOF
 exit(0);
