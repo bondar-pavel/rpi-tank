@@ -70,6 +70,18 @@ my %commands = (
 		help => 'Close connection to the client.'
 	},
 );
+# map real pin number to GPIO pin name
+my %pin2gpio = (
+	12 => 18, # PIN 12 => GPIO18
+	16 => 23,
+	18 => 24,
+	19 => 10, # pins 19-26 are used for hardware v2
+	21 => 9,
+	22 => 25,
+	23 => 11,
+	24 => 8,
+	26 => 7,
+);
 
 my $lock_file = '/tmp/rpi-gpiod.lock';
 
