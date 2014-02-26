@@ -83,6 +83,16 @@ my %pin2gpio = (
 	26 => 7,
 );
 
+# contains only pins used for hardware version 2
+my $avg_values = {
+	19 => 0,
+	21 => 0,
+	22 => 0,
+	23 => 0,
+	24 => 0,
+	26 => 0,
+};
+my $pi_blaster_device = '/dev/pi-blaster';
 my $lock_file = '/tmp/rpi-gpiod.lock';
 
 # Hardware(BMC2835) is specific for Raspberry Pi platform
@@ -235,14 +245,41 @@ sub set_pinouts {
 	open(my $fh, '<', $lock_file) || return info("Unable to open $lock_file, skipping...");
 	flock($fh, LOCK_EX) || return info("Ubable to lock $lock_file, skipping...");
 
-	foreach my $pin (sort keys %values) {
-		debug("Set output pin $pin with value $values{$pin}");
-		Device::BCM2835::gpio_write($pins{$pin}, $values{$pin});
+	if (-e $pi_blaster_device) {
+		set_pinouts_piblaster(\%values);
+	} else {
+		foreach my $pin (sort keys %values) {
+			debug("Set output pin $pin with value $values{$pin}");
+			Device::BCM2835::gpio_write($pins{$pin}, $values{$pin});
+		}
 	}
 
 	# Release lock
 	flock($fh, LOCK_UN);
 	close($fh);
+}
+
+sub update_avg {
+	my $input = shift;
+
+	foreach my $pin (keys %$input) {
+		$$avg_values{$pin} = $$input{$pin} ? $$avg_values{$pin} + 0.02 : 0 ;
+		$$avg_values{$pin} = 0.4 if $$avg_values{$pin} > 0 && $$avg_values{$pin} < 0.4;
+		$$avg_values{$pin} = 1 if $$avg_values{$pin} > 1;
+	}
+	return $avg_values;
+}
+
+sub set_pinouts_piblaster {
+	my $values = shift;
+
+	$values = update_avg($values);
+	if(open(my $wh, '>', $pi_blaster_device)) {
+		info("Map:$values".join("\n",map {"$pin2gpio{$_} => $$values{$_}"} sort keys %$values)."\n");
+		print {$wh} join("\n",map {"$pin2gpio{$_}=$$values{$_}"} keys %$values)."\n";
+	} else {
+		info("Unable to open $pi_blaster_device");
+	}
 }
 
 sub autogenerate_help {
