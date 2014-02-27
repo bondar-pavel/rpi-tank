@@ -45,7 +45,9 @@ my %commands = (
 		code => \&set_output,
 		help => "Set list of pins into high state. Will be set to fallback output values\n" .
 			"once fallback timeout has exceeded.\n" .
-			"Example 'set_output 23 26'."
+			"Example 'set_output 23 26'.\n" .
+			"If pi-blaster backend is used, allows to set PWM on pin:\n" .
+			"Example 'set_output 23=40 26=80', where 23 is a pin, and 40 is 40% PWM for pin 23."
 	},
 	# fallback output: if fallback timeout is exceeded, 
 	'set_fallback_output' =>{
@@ -221,9 +223,6 @@ sub set_fallback_timeout {
 
 sub set_output {
 	my $sock = shift;
-	#my %output_pins = %{@_};
-	#my @up_pins = grep { $output_pins{$_} } keys %output_pins;
-	#set_pinouts(@up_pins);
 	set_pinouts(@_);
 }
 
@@ -235,8 +234,16 @@ sub reset_output {
 
 sub set_pinouts {
 	my %values = map {$_ => 0} sort keys %pins;
-	# set controls pins grabbed from input to high state
 	map {$values{$_} = 1 if exists $values{$_}} @_;
+	foreach (@_) {
+		# set controls pins grabbed from input to high state, binary format
+		if (exists $values{$_}) {
+			$values{$_} = 1;
+		# set per pin PWM
+		} elsif (/(\d+)=(\d+)/ && exists $values{$1}) {
+			$values{$1} = $2/100 if $2 >= 0 && $2 <= 100;
+		}
+	}
 
 	# Exlusively lock gpio_write operations
 	# to synhronize all forked processes
@@ -250,7 +257,7 @@ sub set_pinouts {
 	} else {
 		foreach my $pin (sort keys %values) {
 			debug("Set output pin $pin with value $values{$pin}");
-			Device::BCM2835::gpio_write($pins{$pin}, $values{$pin});
+			Device::BCM2835::gpio_write($pins{$pin}, $values{$pin} ? 1 : 0);
 		}
 	}
 
@@ -261,11 +268,20 @@ sub set_pinouts {
 
 sub update_avg {
 	my $input = shift;
+	my $increment = 0.02;
+	my $start_level = 0.3;
 
-	foreach my $pin (keys %$input) {
-		$$avg_values{$pin} = $$input{$pin} ? $$avg_values{$pin} + 0.02 : 0 ;
-		$$avg_values{$pin} = 0.4 if $$avg_values{$pin} > 0 && $$avg_values{$pin} < 0.4;
-		$$avg_values{$pin} = 1 if $$avg_values{$pin} > 1;
+	foreach my $pin (keys %$avg_values) {
+		next unless exists $$input{$pin};
+		if ($$input{$pin} == 1) {
+			$$avg_values{$pin} = $$avg_values{$pin} + $increment;
+			$$avg_values{$pin} = 1 if $$avg_values{$pin} > 1;
+	                $$avg_values{$pin} = $start_level if $$avg_values{$pin} > 0 && $$avg_values{$pin} < $start_level;
+		} elsif ($$input{$pin} > 0 && $$input{$pin} < 1) {
+			$$avg_values{$pin} = $$input{$pin};
+		} else {
+			$$avg_values{$pin} = $$input{$pin};
+		}
 	}
 	return $avg_values;
 }
@@ -275,7 +291,7 @@ sub set_pinouts_piblaster {
 
 	$values = update_avg($values);
 	if(open(my $wh, '>', $pi_blaster_device)) {
-		info("Map:$values".join("\n",map {"$pin2gpio{$_} => $$values{$_}"} sort keys %$values)."\n");
+		info("Map:\n".join("\n",map {"$pin2gpio{$_} => $$values{$_}"} sort keys %$values)."\n");
 		print {$wh} join("\n",map {"$pin2gpio{$_}=$$values{$_}"} keys %$values)."\n";
 	} else {
 		info("Unable to open $pi_blaster_device");
