@@ -1,7 +1,9 @@
 install:
 	chmod +x ./rpi-gpiod.pl
 	cp ./rpi-gpiod.pl /usr/bin/rpi-gpiod
+
 	cp ./rpi-gpiod.service /usr/lib/systemd/system
+	/usr/bin/systemctl daemon-reload
 
 	chmod +x ./rpi-video
 	cp ./rpi-video /usr/bin/rpi-video
