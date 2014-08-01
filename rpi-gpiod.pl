@@ -106,7 +106,6 @@ my $sock = init_network();
 # prevent zombies
 $SIG{CHLD} = 'IGNORE';
 
-# Allows only one client for now, no forking
 while (1)
 {
 	my $new_sock = $sock->accept();
