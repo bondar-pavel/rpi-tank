@@ -1,5 +1,26 @@
 package RaspberryPi::GPIO;
 
+=pod
+=head1 RaspberryPi::GPIO - GPIO control via tcp/ip using text protocol.
+
+This module provide ability to control Raspberry Pi GPIO ports using simple
+text protocol. You can use wide range of clients to interact with this daemon,
+the most simple one is telnet.
+By default daemon listens on localhost and port 11700.
+Try in console after starting daemon:
+$ telnet localhost 11700
+Examples of commands:
+> help
+Type help to get list of supported commands.
+> set_output 5
+Set pin 6 in high state, all other pins are in low state.
+> set_output 1 3 6 23
+Set pins 1,3,6,23 in high state, all other pins are in low state.
+Pins are separated by space character, there is no limitations on pins count.
+
+=cut
+
+use Pod::Usage;
 use IO::Socket;
 use Fcntl qw(:flock);
 use strict;
@@ -135,6 +156,36 @@ sub set_fallback_timeout {
 	my $timeout = int(shift);
 
 	$fallback_timeout = $timeout if ($timeout > 0 && $timeout < 30);
+}
+
+sub autogenerate_help {
+	my $sock = shift;
+
+	$sock->send("List of commands:\n");
+	foreach my $cmd (sort keys %commands) {
+		$sock->send($cmd ." -\n");
+		if (ref($commands{$cmd}) eq 'HASH' and exists $commands{$cmd}->{help}){
+			# add TAB before each line of help message
+			$sock->send(join("\n", map{"\t" . $_} split("\n", $commands{$cmd}->{help}))."\n");
+		}
+	}
+}
+# service routines
+sub info {
+	my $msg = shift;
+	print "[$$] $msg\n";
+}
+
+sub debug {
+	my $msg = shift;
+	print "[$$] $msg\n" if $debug;
+}
+
+sub usage {
+	print <<EOF;
+This Daemon listens tcp socket and provide remote access over TCP/IP to GPIO pins of Raspberry PI.
+EOF
+	exit(0);
 }
 
 1;
