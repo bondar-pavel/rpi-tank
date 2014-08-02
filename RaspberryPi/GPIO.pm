@@ -6,7 +6,7 @@ package RaspberryPi::GPIO;
 This module provide ability to control Raspberry Pi GPIO ports using simple
 text protocol. You can use wide range of clients to interact with this daemon,
 the most simple one is telnet.
-By default daemon listens on localhost and port 11700.
+By default daemon listens to port 11700 on localhost.
 Try in console after starting daemon:
 $ telnet localhost 11700
 Examples of commands:
@@ -35,11 +35,6 @@ my %commands = (
 			"Example 'set_output 23 26'.\n" .
 			"If pi-blaster backend is used, allows to set PWM on pin:\n" .
 			"Example 'set_output 23=40 26=80', where 23 is a pin, and 40 is 40% PWM for pin 23."
-	},
-	# fallback output: if fallback timeout is exceeded, 
-	'set_fallback_output' =>{
-		help =>	"If fallback timeout is exceeded, server set fallback values as output.\n" .
-			"Useful to stop in case of connection issues.",
 	},
 	'set_fallback_timeout' =>{
 		code => \&set_fallback_timeout,
@@ -70,13 +65,13 @@ sub init{
 
 sub start{
 	my $self = shift;
-	$self->{Socket} =  new IO::Socket::INET (
+	$self->{Socket} = new IO::Socket::INET (
 				LocalHost => $self->{Host} || 'localhost',
 				LocalPort => $self->{Port} || '11700',
 				Proto => 'tcp',
 				Listen => 1,
 				Reuse => 1,
-	                      );
+			);
 	die "Could not create socket: $!\n" unless $self->{Socket};
 
 	# prevent zombies
