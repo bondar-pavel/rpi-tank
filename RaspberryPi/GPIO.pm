@@ -56,7 +56,7 @@ my %commands = (
 );
 
 
-sub init{
+sub new{
 	my $class = shift;
 	my %self = @_;
 	
