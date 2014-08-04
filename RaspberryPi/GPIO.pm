@@ -58,9 +58,9 @@ my %commands = (
 
 sub new{
 	my $class = shift;
-	my %self = @_;
+	my $self = { @_ };
 	
-	return bless \%self, $class;
+	return bless $self, $class;
 }
 
 sub start{
