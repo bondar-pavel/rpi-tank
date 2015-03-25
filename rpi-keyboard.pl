@@ -10,12 +10,13 @@ use Term::ReadKey;
 use Getopt::Long;
 use strict;
 
-my ($debug, $show_usage);
+my ($debug, $show_usage, $servo);
 my $version = 2;
 GetOptions (
 	'debug' =>\$debug, 
 	'help' => \$show_usage,
 	'version|i' => \$version,
+	'servo' => \$servo,
 );
 
 usage() if $show_usage;
@@ -47,8 +48,25 @@ my %v2 = (
 	'tower_right'    => 19,
 );
 
+my %servo_ctl = (
+	'tower_left'	=> '12=+1',
+	'tower_right'	=> '12=-1',
+
+	'tower_up'	=> '11=-1',
+	'tower_down'	=> '11=+1',
+
+	'tower_left_fast'    => '12=+3',
+        'tower_right_fast'   => '12=-3',
+
+        'tower_up_fast'      => '11=-3',
+        'tower_down_fast'    => '11=+3',
+);
+
 my %controls;
-if ($version == 2){
+
+if ($servo) {
+	%controls = %servo_ctl;
+} elsif ($version == 2){
 	%controls = %v2;
 } elsif ($version == 1) {
 	%controls = %v1;
@@ -69,6 +87,12 @@ my %keys = (
 	'D' => \&right_fast,
 	'[' => \&tower_move_left,
 	']' => \&tower_move_right,
+	'p' => \&tower_move_up,
+	';' => \&tower_move_down,
+	'{' => \&tower_left_fast,
+	'}' => \&tower_right_fast,
+	'P' => \&tower_up_fast,
+	':' => \&tower_down_fast,
 );
 
 # hash button names, just to show correct direction
@@ -81,6 +105,13 @@ my %key_names = (
 	'D' => 'right fast',
 	'[' => 'tower left',
 	']' => 'tower right',
+	'p' => 'tower up',
+	';' => 'tower down',
+	';' => 'tower move down',
+	'{' => 'tower left fast',
+	'}' => 'tower right fast',
+	'P' => 'tower up fast',
+	':' => 'tower down fast',
 );
 
 # establish connection to gpiod
@@ -88,8 +119,10 @@ my $socket  = init_network($ARGV[0]);
 
 # set custom readmode and return it back to normal after terminating
 ReadMode('cbreak');
-END {ReadMode('normal');}
-$SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = sub {$socket->close; die; };
+END {
+	ReadMode('normal');
+}
+$SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = sub {$socket->close; print 'killed...'; die; };
 
 while (1)
 {
@@ -97,7 +130,7 @@ while (1)
 	if (exists $keys{$char} and ref($keys{$char}) eq 'CODE'){
 		print "Moving $key_names{$char}\n" if exists $key_names{$char};
 		&{$keys{$char}};
-	} else {
+	} elsif (not $servo) {
 		print "Stop\n";
 		stop();
 	}
@@ -139,6 +172,27 @@ sub tower_move_left {
 sub tower_move_right {
 	set_pinouts('tower_right');
 }
+
+sub tower_move_up {
+	set_pinouts('tower_up');
+}
+
+sub tower_move_down {
+	set_pinouts('tower_down');
+}
+sub tower_left_fast {
+        set_pinouts('tower_left_fast');
+}
+sub tower_right_fast{
+        set_pinouts('tower_right_fast');
+}
+sub tower_up_fast{
+        set_pinouts('tower_up_fast');
+}
+sub tower_down_fast{
+        set_pinouts('tower_down_fast');
+}
+
 
 sub set_pinouts {
 	# set controls from the input to active state

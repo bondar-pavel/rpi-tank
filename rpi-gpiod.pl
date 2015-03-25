@@ -27,11 +27,12 @@ use IO::Socket;
 use Fcntl qw(:flock);
 use strict;
 
-my ($debug, $debug_network, $debug_hardware, $show_usage);
+my ($debug, $debug_network, $debug_hardware, $noreset, $show_usage);
 GetOptions (
 	'debug' =>\$debug,
 	'debug-network' =>\$debug_network,
 	'debug-hardware' =>\$debug_hardware,
+	'noreset' => \$noreset,
 	'help' => \$show_usage,
 );
 
@@ -74,6 +75,7 @@ my %commands = (
 );
 # map real pin number to GPIO pin name
 my %pin2gpio = (
+	11 => 17,
 	12 => 18, # PIN 12 => GPIO18
 	16 => 23,
 	18 => 24,
@@ -85,8 +87,9 @@ my %pin2gpio = (
 	26 => 7,
 );
 
-# contains only pins used for hardware version 2
 my $avg_values = {
+	11 => 0,
+	12 => 0,
 	19 => 0,
 	21 => 0,
 	22 => 0,
@@ -95,11 +98,12 @@ my $avg_values = {
 	26 => 0,
 };
 my $pi_blaster_device = '/dev/pi-blaster';
+my $servoblaster = '/dev/servoblaster';
 my $lock_file = '/tmp/rpi-gpiod.lock';
 
 # Hardware(BMC2835) is specific for Raspberry Pi platform
 # so debuging on other platforms can be done using --debug-network flag
-init_hardware() unless $debug_network;
+init_hardware() unless $debug_network or -e $pi_blaster_device or -e $servoblaster;
 
 my $sock = init_network();
 
@@ -116,8 +120,8 @@ while (1)
 	} elsif ($pid == 0) {
 		info("Client connected");
 
-		# Reset outputs to default state in case of exceeding $fallback_timeout 
-		$SIG{ALRM} = \&reset_output;
+		# Reset outputs to default state in case of exceeding $fallback_timeout
+		$SIG{ALRM} = \&reset_output unless $noreset;
 
 		# give user friendly command promt
 		$new_sock->send('>');
@@ -241,6 +245,8 @@ sub set_pinouts {
 		# set per pin PWM
 		} elsif (/(\d+)=(\d+)/ && exists $values{$1}) {
 			$values{$1} = $2/100 if $2 >= 0 && $2 <= 100;
+		} elsif (/(\d+)=([+-]\d+)/) {
+			$values{$1} = $2;
 		}
 	}
 
@@ -253,6 +259,8 @@ sub set_pinouts {
 
 	if (-e $pi_blaster_device) {
 		set_pinouts_piblaster(\%values);
+	} elsif (-e $servoblaster) {
+		set_pinouts_servoblaster(\%values);
 	} else {
 		foreach my $pin (sort keys %values) {
 			debug("Set output pin $pin with value $values{$pin}");
@@ -267,15 +275,17 @@ sub set_pinouts {
 
 sub update_avg {
 	my $input = shift;
-	my $increment = 0.02;
-	my $start_level = 0.3;
+	my $increment = shift || 0.02;
+	my $start_level = shift || 0.3;
 
 	foreach my $pin (keys %$avg_values) {
 		next unless exists $$input{$pin};
 		if ($$input{$pin} == 1) {
 			$$avg_values{$pin} = $$avg_values{$pin} + $increment;
 			$$avg_values{$pin} = 1 if $$avg_values{$pin} > 1;
-	                $$avg_values{$pin} = $start_level if $$avg_values{$pin} > 0 && $$avg_values{$pin} < $start_level;
+                        if ($$avg_values{$pin} > 0 && $$avg_values{$pin} < $start_level){
+				$$avg_values{$pin} = $start_level;
+			}
 		} elsif ($$input{$pin} > 0 && $$input{$pin} < 1) {
 			$$avg_values{$pin} = $$input{$pin};
 		} else {
@@ -295,6 +305,16 @@ sub set_pinouts_piblaster {
 	} else {
 		info("Unable to open $pi_blaster_device");
 	}
+}
+
+sub set_pinouts_servoblaster {
+	my $values = shift;
+        if(open(my $wh, '>', $servoblaster)) {
+                info("Servo write:\n".join("\n",map {"P1-$_=$$values{$_}"} sort keys %$values)."\n");
+                print {$wh} join("\n",map {"P1-$_=$$values{$_}"} keys %$values)."\n";
+        } else {
+                info("Unable to open $servoblaster");
+        }
 }
 
 sub autogenerate_help {
