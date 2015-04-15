@@ -27,12 +27,13 @@ use IO::Socket;
 use Fcntl qw(:flock);
 use strict;
 
-my ($debug, $debug_network, $debug_hardware, $noreset, $show_usage);
+my ($debug, $debug_network, $debug_hardware, $noreset, $backend_opts, $show_usage);
 GetOptions (
 	'debug' =>\$debug,
 	'debug-network' =>\$debug_network,
 	'debug-hardware' =>\$debug_hardware,
 	'noreset' => \$noreset,
+	'backend' => \&backend_opts,
 	'help' => \$show_usage,
 );
 
@@ -41,12 +42,21 @@ usage() if $show_usage;
 my $fallback_output;
 my $fallback_timeout = 1;
 my %pins;
-my @BACKENDS = (
-	'default',
-	'servoblaster',
-	'piblaster',
+my %BACKENDS = (
+	'default' 	=> {
+		'code' => \&set_pinouts_default,
+		'init' => \&init_hardware,
+	},
+	'servoblaster' 	=> {
+		'code' => \&set_pinouts_servoblaster,
+	},
+	'piblaster' 	=> {
+		'code' => \&set_pinouts_piblaster,
+	},
 );
-my $global_backend = $BACKENDS[0];
+my $global_backend = $backend_opts || 'default';
+my $backend_code = $BACKENDS{$global_backend}->{code};
+
 my %commands = (
 	'set_output' =>{
 		code => \&set_output,
@@ -60,7 +70,7 @@ my %commands = (
 		code => \&set_backend,
 		help => "Set backend, which set signals to GPIO pins.\n" .
 			"Used to switch between ON/OFF and PWD backends for pins. Available backends are: " .
-			join(', ', @BACKENDS) . "\n",
+			join(', ', keys %BACKENDS) . "\n",
 	},
 	# fallback output: if fallback timeout is exceeded, 
 	'set_fallback_output' =>{
@@ -86,19 +96,6 @@ my %commands = (
 	},
 );
 
-# map real pin number to GPIO pin name
-my %pin2gpio = (
-	11 => 17,
-	12 => 18, # PIN 12 => GPIO18
-	16 => 23,
-	18 => 24,
-	19 => 10, # pins 19-26 are used for hardware v2
-	21 => 9,
-	22 => 25,
-	23 => 11,
-	24 => 8,
-	26 => 7,
-);
 
 my $avg_values = {
 	11 => 0,
@@ -114,9 +111,8 @@ my $pi_blaster_device = '/dev/pi-blaster';
 my $servoblaster = '/dev/servoblaster';
 my $lock_file = '/tmp/rpi-gpiod.lock';
 
-# Hardware(BMC2835) is specific for Raspberry Pi platform
-# so debuging on other platforms can be done using --debug-network flag
-init_hardware() unless $debug_network or -e $pi_blaster_device or -e $servoblaster;
+# Init backend hardware if it requires custom initialization
+&{$BACKENDS{$global_backend}->{'init'}} if $BACKENDS{$global_backend}->{'init'};
 
 my $sock = init_network();
 
@@ -157,29 +153,33 @@ while (1)
 }
 
 sub init_hardware {
-	require Device::BCM2835;
-	Device::BCM2835::init() || die "Could not init library";
+	eval {
+		info('Starting BCM2835 init');
+		require Device::BCM2835;
+		Device::BCM2835::init() || die "Could not init library";
 
-	Device::BCM2835::set_debug(1) if $debug_hardware;
+		Device::BCM2835::set_debug(1) if $debug_hardware;
 
-	# hardware pin that can be used for reading/writing
-	%pins = (
-		12 => &Device::BCM2835::RPI_GPIO_P1_12,
-		16 => &Device::BCM2835::RPI_GPIO_P1_16,
-		18 => &Device::BCM2835::RPI_GPIO_P1_18,
-		19 => &Device::BCM2835::RPI_GPIO_P1_19,
-		21 => &Device::BCM2835::RPI_GPIO_P1_21,
-		22 => &Device::BCM2835::RPI_GPIO_P1_22,
-		23 => &Device::BCM2835::RPI_GPIO_P1_23,
-		24 => &Device::BCM2835::RPI_GPIO_P1_24,
-		26 => &Device::BCM2835::RPI_GPIO_P1_26,
-	);
-	# set all controls as outputs
-	foreach my $pin (keys %pins){
-        	Device::BCM2835::gpio_fsel($pins{$pin}, &Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);
-	}
-	# set all outputs as 0
-	set_pinouts();
+		# hardware pin that can be used for reading/writing
+		%pins = (
+			12 => &Device::BCM2835::RPI_GPIO_P1_12,
+			16 => &Device::BCM2835::RPI_GPIO_P1_16,
+			18 => &Device::BCM2835::RPI_GPIO_P1_18,
+			19 => &Device::BCM2835::RPI_GPIO_P1_19,
+			21 => &Device::BCM2835::RPI_GPIO_P1_21,
+			22 => &Device::BCM2835::RPI_GPIO_P1_22,
+			23 => &Device::BCM2835::RPI_GPIO_P1_23,
+			24 => &Device::BCM2835::RPI_GPIO_P1_24,
+			26 => &Device::BCM2835::RPI_GPIO_P1_26,
+		);
+		# set all controls as outputs
+		foreach my $pin (keys %pins){
+			Device::BCM2835::gpio_fsel($pins{$pin}, &Device::BCM2835::BCM2835_GPIO_FSEL_OUTP);
+		}
+		# set all outputs as 0
+		set_pinouts();
+	};
+	return $@;
 }
 
 sub init_network {
@@ -248,15 +248,21 @@ sub set_backend {
 
 	my $backend;
 	chomp($input);
-	for (@BACKENDS) {
-		$backend = $_ if $_ eq $input;
-	}
-	if ($backend) {
+
+	if (exists $BACKENDS{$input}) {
+		if (exists $BACKENDS{$input}->{'init'}) {
+			my $init_result = &{$BACKENDS{$input}->{'init'}};
+			if ($init_result) {
+				$sock->send("Failed to initialize backend $input: $init_result\n");
+				return;
+			}
+		}
 		$sock->send("Changing backend from '$global_backend' to '$input'\n");
-		$global_backend = $backend;
+		$global_backend = $input;
+		$backend_code = $BACKENDS{$input}->{'code'};
 	} else {
 		$sock->send("Invalid backend: $input, allowed values are: " .
-			join(', ', @BACKENDS) . "\n");
+			join(', ', keys %BACKENDS) . "\n");
 	}
 }
 
@@ -286,18 +292,9 @@ sub set_pinouts {
 	# so only one process set outputs at the same time
 	touch($lock_file) unless -s $lock_file;
 	open(my $fh, '<', $lock_file) || return info("Unable to open $lock_file, skipping...");
-	flock($fh, LOCK_EX) || return info("Ubable to lock $lock_file, skipping...");
+	flock($fh, LOCK_EX) || return info("Unable to lock $lock_file, skipping...");
 
-	if (-e $pi_blaster_device) {
-		set_pinouts_piblaster(\%values);
-	} elsif (-e $servoblaster) {
-		set_pinouts_servoblaster(\%values);
-	} else {
-		foreach my $pin (sort keys %values) {
-			debug("Set output pin $pin with value $values{$pin}");
-			Device::BCM2835::gpio_write($pins{$pin}, $values{$pin} ? 1 : 0);
-		}
-	}
+	&$backend_code(\%values);
 
 	# Release lock
 	flock($fh, LOCK_UN);
@@ -325,6 +322,28 @@ sub update_avg {
 	}
 	return $avg_values;
 }
+
+sub set_pinouts_default {
+	my $values = shift;
+	foreach my $pin (sort keys %$values) {
+		debug("Set output pin $pin with value $values->{$pin}");
+		Device::BCM2835::gpio_write($pins{$pin}, $values->{$pin} ? 1 : 0);
+	}
+}
+
+# map real pin number to GPIO pin name
+my %pin2gpio = (
+	11 => 17,
+	12 => 18, # PIN 12 => GPIO18
+	16 => 23,
+	18 => 24,
+	19 => 10, # pins 19-26 are used for hardware v2
+	21 => 9,
+	22 => 25,
+	23 => 11,
+	24 => 8,
+	26 => 7,
+);
 
 sub set_pinouts_piblaster {
 	my $values = shift;
