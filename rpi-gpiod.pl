@@ -41,6 +41,12 @@ usage() if $show_usage;
 my $fallback_output;
 my $fallback_timeout = 1;
 my %pins;
+my @BACKENDS = (
+	'default',
+	'servoblaster',
+	'piblaster',
+);
+my $global_backend = $BACKENDS[0];
 my %commands = (
 	'set_output' =>{
 		code => \&set_output,
@@ -49,6 +55,12 @@ my %commands = (
 			"Example 'set_output 23 26'.\n" .
 			"If pi-blaster backend is used, allows to set PWM on pin:\n" .
 			"Example 'set_output 23=40 26=80', where 23 is a pin, and 40 is 40% PWM for pin 23."
+	},
+	'set_backend' =>{
+		code => \&set_backend,
+		help => "Set backend, which set signals to GPIO pins.\n" .
+			"Used to switch between ON/OFF and PWD backends for pins. Available backends are: " .
+			join(', ', @BACKENDS) . "\n",
 	},
 	# fallback output: if fallback timeout is exceeded, 
 	'set_fallback_output' =>{
@@ -73,6 +85,7 @@ my %commands = (
 		help => 'Close connection to the client.'
 	},
 );
+
 # map real pin number to GPIO pin name
 my %pin2gpio = (
 	11 => 17,
@@ -227,6 +240,24 @@ sub set_fallback_timeout {
 sub set_output {
 	my $sock = shift;
 	set_pinouts(@_);
+}
+
+sub set_backend {
+	my $sock = shift;
+	my $input = shift;
+
+	my $backend;
+	chomp($input);
+	for (@BACKENDS) {
+		$backend = $_ if $_ eq $input;
+	}
+	if ($backend) {
+		$sock->send("Changing backend from '$global_backend' to '$input'\n");
+		$global_backend = $backend;
+	} else {
+		$sock->send("Invalid backend: $input, allowed values are: " .
+			join(', ', @BACKENDS) . "\n");
+	}
 }
 
 sub reset_output {
