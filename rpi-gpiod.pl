@@ -43,15 +43,15 @@ my $fallback_output;
 my $fallback_timeout = 1;
 my %pins;
 my %BACKENDS = (
-	'default' 	=> {
-		'code' => \&set_pinouts_default,
-		'init' => \&init_hardware,
+	'default'	=> {
+		'code'	=> \&set_pinouts_default,
+		'init'	=> \&init_hardware,
 	},
-	'servoblaster' 	=> {
-		'code' => \&set_pinouts_servoblaster,
+	'servoblaster'	=> {
+		'code'	=> \&set_pinouts_servoblaster,
 	},
-	'piblaster' 	=> {
-		'code' => \&set_pinouts_piblaster,
+	'piblaster'	=> {
+		'code' 	=> \&set_pinouts_piblaster,
 	},
 );
 my $global_backend = $backend_opts || 'default';
