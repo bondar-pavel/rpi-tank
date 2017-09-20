@@ -4,7 +4,7 @@
 # -f for framerate
 
 RESOLUTION=640x480
-FRAMERATE=3
+FRAMERATE=10
 
 while getopts ":s:f:" opt; do
   case $opt in
@@ -39,5 +39,9 @@ while getopts ":s:f:" opt; do
       ;;
   esac
 done
-
-mjpg_streamer -i "/usr/lib/input_uvc.so -f $FRAMERATE -r $RESOLUTION" -o "/usr/lib/output_http.so -w /srv/http -p 8280"
+# -y
+#mjpg_streamer -i "/usr/lib/input_uvc.so -n -f $FRAMERATE -r $RESOLUTION" -o "/usr/lib/output_http.so -w /srv/http -p 8280"
+STREAMER_DIR=~/git/mjpg-streamer/mjpg-streamer-experimental
+export LD_LIBRARY_PATH=$STREAMER_DIR
+$STREAMER_DIR/mjpg_streamer -i "input_uvc.so -n -f $FRAMERATE -r $RESOLUTION" -o "output_http.so -w /srv/http -p 8280 -c log:pass"
+#password -c log:pass
