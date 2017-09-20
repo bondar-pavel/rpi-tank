@@ -126,7 +126,9 @@ $SIG{TERM} = $SIG{INT} = $SIG{QUIT} = $SIG{HUP} = sub {$socket->close; print 'ki
 
 while (1)
 {
+	print "Keys:". GetControlChars ."\n";
 	my $char = ReadKey(0.2);
+	#print "Char $char\n";
 	if (exists $keys{$char} and ref($keys{$char}) eq 'CODE'){
 		print "Moving $key_names{$char}\n" if exists $key_names{$char};
 		&{$keys{$char}};
