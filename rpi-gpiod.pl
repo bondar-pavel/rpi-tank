@@ -47,6 +47,10 @@ my %BACKENDS = (
 		'code'	=> \&set_pinouts_default,
 		'init'	=> \&init_hardware,
 	},
+	'sysfs'		=> {
+		'code'	=> \&set_pinouts_sysfs,
+		'init'	=> \&init_sysfs,
+	},
 	'servoblaster'	=> {
 		'code'	=> \&set_pinouts_servoblaster,
 	},
@@ -54,7 +58,7 @@ my %BACKENDS = (
 		'code' 	=> \&set_pinouts_piblaster,
 	},
 );
-my $global_backend = $backend_opts || 'default';
+my $global_backend = $backend_opts || 'sysfs';
 my $backend_code = $BACKENDS{$global_backend}->{code};
 
 my %commands = (
@@ -96,6 +100,19 @@ my %commands = (
 	},
 );
 
+# map real pin number to GPIO pin name
+my %pin2gpio = (
+	11 => 17,
+	12 => 18, # PIN 12 => GPIO18
+	16 => 23,
+	18 => 24,
+	19 => 10, # pins 19-26 are used for hardware v2
+	21 => 9,
+	22 => 25,
+	23 => 11,
+	24 => 8,
+	26 => 7,
+);
 
 my $avg_values = {
 	11 => 0,
@@ -149,6 +166,34 @@ while (1)
 		exit 0;
 	} else {
 		info("Failed to fork");
+	}
+}
+
+sub init_sysfs {
+	info('Initializing sysfs GPIO interfave');
+	my $base = '/sys/class/gpio';
+	if ( ! -e "$base/export") {
+		info('Error: Sysfs interface is not supported!');
+		return;
+	}
+	# use global dict with pin to gpio mapping to initialize outputs
+	foreach my $pin (values %pin2gpio) {
+		my $pin_dir = "$base/gpio$pin";
+		# Skip pin init if it already initialized
+		if ( -d $pin_dir) {
+			info("Pin $pin is already initialized");
+			next;
+		}
+
+		my $result = `echo "$pin" > $base/export`;
+		info($result) if $result;
+		# validate gpio pin is activated and set it to output low
+		if (-d "$pin_dir") {
+			$result = `echo "out" > $pin_dir/direction`;
+			info($result) if $result;
+		} else {
+			info("Error: failed to initialize pin $pin");
+		}
 	}
 }
 
@@ -273,7 +318,7 @@ sub reset_output {
 }
 
 sub set_pinouts {
-	my %values = map {$_ => 0} sort keys %pins;
+	my %values = map {$_ => 0} sort keys %pin2gpio;
 	map {$values{$_} = 1 if exists $values{$_}} @_;
 	foreach (@_) {
 		# set controls pins grabbed from input to high state, binary format
@@ -294,6 +339,7 @@ sub set_pinouts {
 	open(my $fh, '<', $lock_file) || return info("Unable to open $lock_file, skipping...");
 	flock($fh, LOCK_EX) || return info("Unable to lock $lock_file, skipping...");
 
+	info("$_") for (@_);
 	&$backend_code(\%values);
 
 	# Release lock
@@ -331,19 +377,18 @@ sub set_pinouts_default {
 	}
 }
 
-# map real pin number to GPIO pin name
-my %pin2gpio = (
-	11 => 17,
-	12 => 18, # PIN 12 => GPIO18
-	16 => 23,
-	18 => 24,
-	19 => 10, # pins 19-26 are used for hardware v2
-	21 => 9,
-	22 => 25,
-	23 => 11,
-	24 => 8,
-	26 => 7,
-);
+sub set_pinouts_sysfs {
+	my $values = shift;
+	my $cmd;
+	foreach my $pin (sort keys %$values) {
+		debug("Set output pin $pin with value $values->{$pin}");
+		# map to gpio number
+		my $gpio = $pin2gpio{$pin};
+		$cmd .= "echo \"$values->{$pin}\" > /sys/class/gpio/gpio$gpio/value;";
+	}
+	my $result = `$cmd`;
+	info($result) if $result;
+}
 
 sub set_pinouts_piblaster {
 	my $values = shift;
