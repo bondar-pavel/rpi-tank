@@ -380,12 +380,16 @@ sub set_pinouts_sysfs {
 	my $cmd;
 	foreach my $pin (sort keys %$values) {
 		debug("Set output pin $pin with value $values->{$pin}");
-		# map to gpio number
+		# map pin to gpio number
 		my $gpio = $pin2gpio{$pin};
-		$cmd .= "echo \"$values->{$pin}\" > /sys/class/gpio/gpio$gpio/value;";
+		# Old way to setup pins was creating subshell, and it was really slow.
+		# So switching to another approach, where we write directly from perl
+		# into sysfs emulated files
+		if (open(my $fh, '>', "/sys/class/gpio/gpio$gpio/value")) {
+			print $fh $values->{$pin};
+			close($fh);
+		}
 	}
-	my $result = `$cmd`;
-	info($result) if $result;
 }
 
 sub set_pinouts_piblaster {
