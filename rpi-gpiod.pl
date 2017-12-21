@@ -22,7 +22,6 @@
 #   just printing what values are gonna be set.
 
 use Getopt::Long;
-use File::Touch;
 use IO::Socket;
 use Fcntl qw(:flock);
 use strict;
@@ -335,8 +334,7 @@ sub set_pinouts {
 	# Exlusively lock gpio_write operations
 	# to synhronize all forked processes
 	# so only one process set outputs at the same time
-	touch($lock_file) unless -s $lock_file;
-	open(my $fh, '<', $lock_file) || return info("Unable to open $lock_file, skipping...");
+	open(my $fh, '>', $lock_file) || return info("Unable to open $lock_file, skipping...");
 	flock($fh, LOCK_EX) || return info("Unable to lock $lock_file, skipping...");
 
 	info("$_") for (@_);
